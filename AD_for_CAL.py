@@ -160,7 +160,7 @@ if __name__ == "__main__":
     
 
 
-    # one-off check: tail bound size and its effect in double precision
+    #  check: tail bound precision 
     for mu in (1e-4, 0.02, 0.4):
         for j in (0, 1):
             s = sum(c(mu, 2 * m + j) for m in range(Ncut + 1))

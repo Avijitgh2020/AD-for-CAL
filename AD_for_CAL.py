@@ -107,7 +107,7 @@ def rate_k(pxx, eb, ep, b):
     bracket = 1 - fec * h(eb2) - h(ep2)
     return (pxx / b) * pAD * bracket if bracket >= 1e-12 else 0.0
 
-def rate(mu, eta, cache, Om):
+def rate(mu, eta, cache, Om, bmax = B_Max):
     g = np.sqrt(eta) * mu
     ann = []
     for kc in (1, 0):                       # announcements (1,0) and (0,1)
@@ -117,15 +117,15 @@ def rate(mu, eta, cache, Om):
         ann.append((pxx, eX(kc, g, Om), eZ_upp(mu, pxx, cache)))
     return max(sum(rate_k(*a, b) for a in ann) for b in range(1, B_Max + 1))
 
-def best_rate(L, d_ph, d_pol):
+def best_rate(L, d_ph, d_pol, bmax = B_Max):
     eta = 10 ** (-L / 10)
     tA = np.arcsin(np.sqrt(d_pol)); tB = -tA
     Om = np.cos(d_ph * np.pi) * np.cos(tA - tB)
     cache = pzz_cache(eta, tA, tB)
-    vals = [rate(mu, eta, cache, Om) for mu in Mu_Grid]
+    vals = [rate(mu, eta, cache, Om, bmax) for mu in Mu_Grid]
     i = int(np.argmax(vals))
     lo, hi = Mu_Grid[max(i - 1, 0)], Mu_Grid[min(i + 1, len(Mu_Grid) - 1)]
-    res = minimize_scalar(lambda mu: -rate(mu, eta, cache, Om),
+    res = minimize_scalar(lambda mu: -rate(mu, eta, cache, Om, bmax),
                           bounds=(lo, hi), method="bounded", options={"xatol": 1e-7})
     return max(vals[i], -res.fun)
 

@@ -10,7 +10,7 @@ fec = 1.16         # error-correction inefficiency
 Ncut = 40          # truncation of cat-state sums
 B_Max = 20         # max AD block size
 Db_Per_Km = 0.2
-Loss_Step = 0.5    # dB
+Loss_Step = 1.0    # dB
 Loss_Max = 150.0   # dB
 
 Known_S = [(0, 0), (0, 2), (2, 0), (2, 2), (0, 4), (4, 0), (1, 1), (1, 3), (3, 1)]
@@ -87,7 +87,7 @@ def eZ_upp(mu, pxx, cache):
     total = 0.0
     for j in (0, 1):
         pairs = [(2 * mA + j, 2 * mB + j) for mA, mB in SJ[j]]
-        csum = sum(c(mu, 2 * m + j) for m in range(Ncut + 1))
+        csum = sum(c(mu, 2 * m + j) for m in range(Ncut + 1)) + tail_bound(mu, j)
         Delta = max(csum ** 2 - sum(c(mu, a) * c(mu, b) for a, b in pairs), 0.0)
         bracket = sum(c(mu, a) * c(mu, b) * np.sqrt(max(cache[(a, b)], 0.0))
                       for a, b in pairs)
@@ -157,11 +157,14 @@ if __name__ == "__main__":
         plt.semilogy(km, R, lw=2.5,
                      label=rf"$\delta_{{ph}}=\delta_{{pol}}={100 * d_pol:g}\%$")
 
+      
+
+      
     L = np.linspace(0.001, 120, 800)
     plt.semilogy(L / Db_Per_Km, -np.log2(1 - 10 ** (-L / 10)), ":", color="0.4",
                  label=r"SKC$_0$")
     plt.xlim(0, 600); plt.ylim(1e-15, 1)
-    plt.xlabel("Distance (km)"); plt.ylabel("Secret-key rate (bits/pulse)")
+    plt.xlabel("Distance (km)"); plt.ylabel("Secret-key rate (bits/rounds)")
     plt.grid(alpha=0.3); plt.legend()
     plt.tight_layout()
     plt.show()

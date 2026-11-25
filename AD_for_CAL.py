@@ -157,7 +157,17 @@ if __name__ == "__main__":
         plt.semilogy(km, R, lw=2.5,
                      label=rf"$\delta_{{ph}}=\delta_{{pol}}={100 * d_pol:g}\%$")
 
-      
+    
+
+
+    # one-off check: tail bound size and its effect in double precision
+    for mu in (1e-4, 0.02, 0.4):
+        for j in (0, 1):
+            s = sum(c(mu, 2 * m + j) for m in range(Ncut + 1))
+            print(mu, j, tail_bound(mu, j), s + tail_bound(mu, j) == s)   # expect True
+   
+
+   
 
       
     L = np.linspace(0.001, 120, 800)

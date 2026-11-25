@@ -115,7 +115,7 @@ def rate(mu, eta, cache, Om, bmax = B_Max):
         if pxx <= 0:
             return 0.0
         ann.append((pxx, eX(kc, g, Om), eZ_upp(mu, pxx, cache)))
-    return max(sum(rate_k(*a, b) for a in ann) for b in range(1, B_Max + 1))
+    return max(sum(rate_k(*a, b) for a in ann) for b in range(1, bmax + 1))
 
 def best_rate(L, d_ph, d_pol, bmax = B_Max):
     eta = 10 ** (-L / 10)
@@ -129,11 +129,28 @@ def best_rate(L, d_ph, d_pol, bmax = B_Max):
                           bounds=(lo, hi), method="bounded", options={"xatol": 1e-7})
     return max(vals[i], -res.fun)
 
-def find_cutoff(d_ph, d_pol, L_last, tol=1e-4):
+SKR_THRESHOLD = 1e-15     # bits per round
+
+
+# Loose scan on the Loss_Step grid until the rate is no longer positive.
+def sweep(d_ph, d_pol, bmax):
+   
+    Ls, Rs = [], []
+    for L in np.arange(0, Loss_Max + Loss_Step, Loss_Step):
+        r = best_rate(L, d_ph, d_pol, bmax)
+        if r <= 0:
+            break
+        Ls.append(L); Rs.append(r)
+    return np.array(Ls), np.array(Rs)
+
+#Largest loss (dB) with rate > 0 (thr = 0) or rate >= thr (thr > 0).
+def find_boundary(d_ph, d_pol, L_last, bmax, thr=0.0, tol=1e-4):
+    
+    ok = (lambda r: r > 0) if thr == 0 else (lambda r: r >= thr)
     lo, hi = L_last, L_last + Loss_Step
     while hi - lo > tol:
         mid = 0.5 * (lo + hi)
-        if best_rate(mid, d_ph, d_pol) > 0:
+        if ok(best_rate(mid, d_ph, d_pol, bmax)):
             lo = mid
         else:
             hi = mid
@@ -142,29 +159,46 @@ def find_cutoff(d_ph, d_pol, L_last, tol=1e-4):
 
 
 # Sweep and plot
+# Sweep and plot
 if __name__ == "__main__":
     plt.figure(figsize=(9, 7))
+    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    rows = []
+
+    for idx, (d_ph, d_pol) in enumerate(Miss_allignment_cases):
+        col = colors[idx % len(colors)]
+        for bmax, style in ((1, "--"), (B_Max, "-")):          # no AD, then AD
+            Ls, Rs = sweep(d_ph, d_pol, bmax)
+            cut = find_boundary(d_ph, d_pol, Ls[-1], bmax)                        
+            L_thr = find_boundary(d_ph, d_pol, Ls[Rs >= SKR_THRESHOLD].max(), bmax,
+                                  thr=SKR_THRESHOLD)                              # SKR >= 1e-15
+            rows.append((d_ph, d_pol, bmax, cut, L_thr))
+            plt.semilogy(Ls / Db_Per_Km, Rs, style, lw=2.5, color=col,
+                         label=(rf"$\delta_{{ph}}=\delta_{{pol}}={100 * d_pol:g}\%$"
+                                if bmax > 1 else None))
+
+    print(f"\nDistances at SKR >= {SKR_THRESHOLD:.0e} bits/round reported as the last whole "
+          f"kilometre (floor) for both protocols.")
+    print(f"{'misalign.':>10} {'protocol':>10} | {'positivity boundary':>24} | "
+          f"{'SKR >= 1e-15 boundary':>24} | last whole km")
+    whole = {}
+    for d_ph, d_pol, bmax, cut, L_thr in rows:
+        prot = "no AD" if bmax == 1 else f"AD b<={bmax}"
+        km_whole = int(np.floor(L_thr / Db_Per_Km))
+        whole[(d_ph, d_pol, bmax)] = km_whole
+        print(f"{100 * d_ph:9g}% {prot:>10} | {cut:9.4f} dB ({cut / Db_Per_Km:8.2f} km) | "
+              f"{L_thr:9.4f} dB ({L_thr / Db_Per_Km:8.2f} km) | {km_whole:6d} km")
     for d_ph, d_pol in Miss_allignment_cases:
-        km, R = [], []
-        for L in np.arange(0, Loss_Max + Loss_Step, Loss_Step):
-            r = best_rate(L, d_ph, d_pol)
-            if r <= 0:
-                break
-            km.append(L / Db_Per_Km); R.append(r)
-        cut = find_cutoff(d_ph, d_pol, km[-1] * Db_Per_Km)
-        print(f"delta_ph = {100 * d_ph:g}%, delta_pol = {100 * d_pol:g}%: "
-              f"cutoff = {cut:.3f} dB ({cut / Db_Per_Km:.0f} km)")
-        plt.semilogy(km, R, lw=2.5,
-                     label=rf"$\delta_{{ph}}=\delta_{{pol}}={100 * d_pol:g}\%$")
+        gain = whole[(d_ph, d_pol, B_Max)] - whole[(d_ph, d_pol, 1)]
+        print(f"gain at SKR >= {SKR_THRESHOLD:.0e}, {100 * d_ph:g}%/{100 * d_pol:g}%: {gain} km")
 
-    
-
-      
     L = np.linspace(0.001, 120, 800)
     plt.semilogy(L / Db_Per_Km, -np.log2(1 - 10 ** (-L / 10)), ":", color="0.4",
                  label=r"SKC$_0$")
+    plt.axhline(SKR_THRESHOLD, color="0.6", lw=0.8, ls="-.")
     plt.xlim(0, 600); plt.ylim(1e-15, 1)
-    plt.xlabel("Distance (km)"); plt.ylabel("Secret-key rate (bits/rounds)")
+    plt.xlabel("Distance (km)"); plt.ylabel("Secret-key rate (bits/round)")
+    plt.title(f"solid: with AD (b <= {B_Max}), dashed: without AD")
     plt.grid(alpha=0.3); plt.legend()
     plt.tight_layout()
     plt.show()

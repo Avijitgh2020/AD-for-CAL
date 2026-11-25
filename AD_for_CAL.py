@@ -158,7 +158,7 @@ def find_boundary(d_ph, d_pol, L_last, bmax, thr=0.0, tol=1e-4):
 
 
 
-# Sweep and plot
+
 # Sweep and plot
 if __name__ == "__main__":
     plt.figure(figsize=(9, 7))

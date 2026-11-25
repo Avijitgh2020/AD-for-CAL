@@ -177,20 +177,20 @@ if __name__ == "__main__":
                          label=(rf"$\delta_{{ph}}=\delta_{{pol}}={100 * d_pol:g}\%$"
                                 if bmax > 1 else None))
 
-    print(f"\nDistances at SKR >= {SKR_THRESHOLD:.0e} bits/round reported as the last whole "
-          f"kilometre (floor) for both protocols.")
-    print(f"{'misalign.':>10} {'protocol':>10} | {'positivity boundary':>24} | "
-          f"{'SKR >= 1e-15 boundary':>24} | last whole km")
-    whole = {}
+        print(f"\nDistances at SKR >= {SKR_THRESHOLD:.0e} bits/round, rounded to the nearest "
+          f"kilometre for both protocols. Gains computed from unrounded distances.")
+    print(f"{'misalign.':>10} {'protocol':>10} | {'positivity':>10} | {'SKR >= 1e-15':>12}")
+    dist = {}
     for d_ph, d_pol, bmax, cut, L_thr in rows:
         prot = "no AD" if bmax == 1 else f"AD b<={bmax}"
-        km_whole = int(np.floor(L_thr / Db_Per_Km))
-        whole[(d_ph, d_pol, bmax)] = km_whole
-        print(f"{100 * d_ph:9g}% {prot:>10} | {cut:9.4f} dB ({cut / Db_Per_Km:8.2f} km) | "
-              f"{L_thr:9.4f} dB ({L_thr / Db_Per_Km:8.2f} km) | {km_whole:6d} km")
+        dist[(d_ph, d_pol, bmax)] = L_thr / Db_Per_Km                   # unrounded, used for gains
+        km_cut = int(np.floor(cut / Db_Per_Km + 0.5))                   # nearest km
+        km_thr = int(np.floor(L_thr / Db_Per_Km + 0.5))                 # nearest km
+        print(f"{100 * d_ph:9g}% {prot:>10} | {km_cut:7d} km | {km_thr:9d} km")
     for d_ph, d_pol in Miss_allignment_cases:
-        gain = whole[(d_ph, d_pol, B_Max)] - whole[(d_ph, d_pol, 1)]
-        print(f"gain at SKR >= {SKR_THRESHOLD:.0e}, {100 * d_ph:g}%/{100 * d_pol:g}%: {gain} km")
+        gain = dist[(d_ph, d_pol, B_Max)] - dist[(d_ph, d_pol, 1)]      # subtract unrounded
+        print(f"gain at SKR >= {SKR_THRESHOLD:.0e}, {100 * d_ph:g}%/{100 * d_pol:g}%: "
+              f"{int(np.floor(gain + 0.5))} km")                         # then round once
 
     L = np.linspace(0.001, 120, 800)
     plt.semilogy(L / Db_Per_Km, -np.log2(1 - 10 ** (-L / 10)), ":", color="0.4",

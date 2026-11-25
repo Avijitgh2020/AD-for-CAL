@@ -177,21 +177,26 @@ if __name__ == "__main__":
                          label=(rf"$\delta_{{ph}}=\delta_{{pol}}={100 * d_pol:g}\%$"
                                 if bmax > 1 else None))
 
-        print(f"\nDistances at SKR >= {SKR_THRESHOLD:.0e} bits/round, rounded to the nearest "
-          f"kilometre for both protocols. Gains computed from unrounded distances.")
-    print(f"{'misalign.':>10} {'protocol':>10} | {'positivity':>10} | {'SKR >= 1e-15':>12}")
-    dist = {}
+    # positivity cutoff with AD 
+    print(f"\nSection 1: positivity cutoff with AD , rounded to the nearest km")
     for d_ph, d_pol, bmax, cut, L_thr in rows:
-        prot = "no AD" if bmax == 1 else f"AD b<={bmax}"
-        dist[(d_ph, d_pol, bmax)] = L_thr / Db_Per_Km                   # unrounded, used for gains
-        km_cut = int(np.floor(cut / Db_Per_Km + 0.5))                   # nearest km
-        km_thr = int(np.floor(L_thr / Db_Per_Km + 0.5))                 # nearest km
-        print(f"{100 * d_ph:9g}% {prot:>10} | {km_cut:7d} km | {km_thr:9d} km")
-    for d_ph, d_pol in Miss_allignment_cases:
-        gain = dist[(d_ph, d_pol, B_Max)] - dist[(d_ph, d_pol, 1)]      # subtract unrounded
-        print(f"gain at SKR >= {SKR_THRESHOLD:.0e}, {100 * d_ph:g}%/{100 * d_pol:g}%: "
-              f"{int(np.floor(gain + 0.5))} km")                         # then round once
+        if bmax == B_Max:
+            km = int(np.floor(cut / Db_Per_Km + 0.5))
+            print(f"delta_ph = {100 * d_ph:g}%, delta_pol = {100 * d_pol:g}%: "
+                  f"cutoff = {cut:.3f} dB ({km} km)")
 
+    # distances at SKR >= 1e-15
+    print(f"\nSection 2: distances at SKR >= {SKR_THRESHOLD:.0e} bits/round, rounded to the "
+          f"nearest km (gains from unrounded distances)")
+    dist = {(d_ph, d_pol, bmax): L_thr / Db_Per_Km for d_ph, d_pol, bmax, cut, L_thr in rows}
+    for d_ph, d_pol in Miss_allignment_cases:
+        d0 = dist[(d_ph, d_pol, 1)]          # no AD, km (unrounded)
+        d1 = dist[(d_ph, d_pol, B_Max)]      # AD, km (unrounded)
+        print(f"delta_ph = {100 * d_ph:g}%, delta_pol = {100 * d_pol:g}%: "
+              f"no AD = {d0 * Db_Per_Km:.3f} dB ({int(np.floor(d0 + 0.5))} km), "
+              f"AD = {d1 * Db_Per_Km:.3f} dB ({int(np.floor(d1 + 0.5))} km), "
+              f"gain = {int(np.floor(d1 - d0 + 0.5))} km")
+          
     L = np.linspace(0.001, 120, 800)
     plt.semilogy(L / Db_Per_Km, -np.log2(1 - 10 ** (-L / 10)), ":", color="0.4",
                  label=r"SKC$_0$")
